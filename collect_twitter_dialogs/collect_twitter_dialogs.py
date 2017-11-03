@@ -10,7 +10,7 @@
 
 """
 
-import argparse 
+import argparse
 import json
 import sys
 import six
@@ -53,7 +53,7 @@ def Main(args):
         if not os.path.exists(args.outdir):
             os.mkdir(args.outdir)
 
-    # open a session 
+    # open a session
     session = OAuth1Session(ConsumerKey, ConsumerSecret, AccessToken, AccessTokenSecret)
 
     # setup API object
@@ -137,7 +137,7 @@ def Main(args):
                 reply_id = tweet_set[tid]['in_reply_to_status_id']
                 while reply_id is not None:
                     visited.add(reply_id)
-                    # if there already exists a dialog associated with reply_id, 
+                    # if there already exists a dialog associated with reply_id,
                     # the dialog is deleted because it's not a complete dialog.
                     if str(reply_id) in dialog_set:
                         del dialog_set[str(reply_id)]
@@ -176,7 +176,7 @@ if __name__ =="__main__":
     parser.add_argument('-t', '--target', help="read account names from a file")
     parser.add_argument('-o', '--outdir', help="output directory")
     parser.add_argument('-l', '--logfile', help="set a log file")
-    parser.add_argument('-n', '--count', default=-1, type=int, 
+    parser.add_argument('-n', '--count', default=-1, type=int,
                         help="maximum number of tweets acquired from each account")
     parser.add_argument('-d', '--debug', action='store_true', help="debug mode")
     parser.add_argument('-s', '--silent', action='store_true', help="silent mode")
@@ -209,4 +209,3 @@ if __name__ =="__main__":
         sys.exit(1)
 
     logger.info('done')
-

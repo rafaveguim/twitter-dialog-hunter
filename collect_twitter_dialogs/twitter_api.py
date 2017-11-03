@@ -9,7 +9,7 @@
 
 """
 
-import argparse 
+import argparse
 import json
 import sys
 import six
@@ -22,7 +22,7 @@ from datetime import datetime
 # get a logger object
 logger = logging.getLogger('root')
 
-# base API caller 
+# base API caller
 class TwitterAPI(object):
     def __init__(self, command, session):
         self.rest_api_url = 'https://api.twitter.com/1.1'
@@ -53,7 +53,7 @@ class TwitterAPI(object):
                 if self.extract(data) == False: # if no more data need to be acquired
                     break
                 n_errors = 0
-    
+
                 # check if header includes 'X-Rate-Limit-Remaining'
                 if 'X-Rate-Limit-Remaining' in res.headers \
                 and 'X-Rate-Limit-Reset' in res.headers:
@@ -65,7 +65,7 @@ class TwitterAPI(object):
                         self.waitReady(self.session)
                 else:
                     self.waitReady(self.session)
-    
+
             elif res.status_code==401 or res.status_code==404:
                 logger.warn('Twitter API error %d, see %s' % (res.status_code, self.error_code_url))
                 logger.warn('error occurred in %s' % self.command)
@@ -74,12 +74,12 @@ class TwitterAPI(object):
                 n_errors += 1
                 if n_errors > retry:
                     raise Exception('Twitter API error %d, see %s' % (res.status_code, self.error_code_url))
-    
+
                 logger.warn('Twitter API error %d, see %s' % (res.status_code, self.error_code_url))
                 logger.warn('Service Unavailable ... wait 15 minutes')
                 time.sleep(905)
-    
-        return self.result 
+
+        return self.result
 
     # parameter setting
     def _set_param(self, key, value, default=None):
@@ -118,17 +118,17 @@ class TwitterAPI(object):
                     n_errors = 0
                 else:
                     break
-    
+
             else:
                 n_errors += 1
                 if n_errors > retry:
                     raise Exception('Twitter API error %d, see %s' % (res.status_code, self.error_code_url))
-    
+
                 logger.warn('Twitter API error %d, see %s' % (res.status_code, self.error_code_url))
                 logger.warn('Service Unavailable ... wait 15 minutes')
                 time.sleep(905)
 
-    
+
 ## some methods to get data
 
 class GETSearchTweets(TwitterAPI):
@@ -285,4 +285,3 @@ class GETUsersSearch(TwitterAPI):
         # for the next call
         self.params['page'] += 1
         return True
-
