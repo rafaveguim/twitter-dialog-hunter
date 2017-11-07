@@ -171,11 +171,11 @@ def get_auth(config_path):
 BLOOM_FILTER = '/Users/rafa/Data/twitter-convos/bloom.pickle'
 
 
-def main(outfile_path, config_path):
+def main(outfile_path, config_path, max_processes):
     # listen to the stream for english tweets
     # then find author and look for conversations in their timelines
     myStream = tweepy.Stream(auth=get_auth(config_path),
-        listener=StreamListener(outfile_path, config_path))
+        listener=StreamListener(outfile_path, config_path, max_processes))
 
     while True:
         try:
@@ -187,15 +187,18 @@ def main(outfile_path, config_path):
 
 def options():
     parser = argparse.ArgumentParser()
-    parser.add_argument('outfile')
     parser.add_argument('config')
+    parser.add_argument('outfile')
+    parser.add_argument('-p', '--max_processes', type=int)
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     opts = options()
-    # print(opts.config.read())
-    main(opts.outfile, opts.config)
+    if not opts.max_processes:
+        opts.max_processes = max([mp.cpu_count() - 1, 1])
+
+    main(opts.outfile, opts.config, opts.max_processes)
 
 
 # TODO:
