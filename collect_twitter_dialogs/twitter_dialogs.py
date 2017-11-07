@@ -33,10 +33,10 @@ logger = logging.getLogger("root")
 logger.setLevel(logging.INFO)
 
 
-def get_session(config_file):
+def get_session(config_path):
     # get access keys from a config file
     config = ConfigParser()
-    config.read(config_file)
+    config.read(config_path)
     ConsumerKey = config.get('AccessKeys','ConsumerKey')
     ConsumerSecret = config.get('AccessKeys','ConsumerSecret')
     AccessToken = config.get('AccessKeys','AccessToken')
