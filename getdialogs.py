@@ -229,8 +229,8 @@ def main(outfile_path, config_path, max_threads, max_processes,
 
 def options():
     parser = argparse.ArgumentParser()
-    parser.add_argument('config')
     parser.add_argument('outfile')
+    parser.add_argument('--config', default='config.ini')
     parser.add_argument('-p', '--max_processes', type=int,
         help="the number of parallel workers (processes)")
     parser.add_argument('-t', '--max_threads', type=int, default=2,
