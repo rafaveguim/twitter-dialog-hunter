@@ -1,133 +1,155 @@
-# DSTC6: End-to-End Conversation Modeling Track
+# Twitter dialog harvester
 
-# Registration
-  Please register:
-      https://goo.gl/forms/Fxy061gHuSOZGC1i2
-      
-# News
-- Download the official training data: Sep 7-18 2017 
-- Test data distribution: Sep 25 2017
-- Submission: Oct 8 2017 
+This Python script uses the Twitter API and BeautifulSoup to
+find and download dialogs from Twitter. It is built on top of the
+`collect_twitter_dialogs` module from DSTC6-End-to-End-Conversation-Modeling.
 
-![Easy 3 Step Data Collection](https://github.com/dialogtekgeek/DSTC6-End-to-End-Conversation-Modeling/issues/5 "Easy 3 Step data collection")
-
-
-# Track Description
-1. Main task (mandatory): Customer service dialog using Twitter
-
-    (*) The tools to download the twitter data and transform to the dialog format from the data are provided. 
+It is meant to overcome some limitations of the DSTC6 module and other
+scrapers. The script doesn't require a list of source accounts,
+and for the most part avoids rate-limiting by scraping public urls. You can
+define the desired range of dialog length, and scale the execution across cores
+and treads.
 
 
-    Task A: Full or part of the training data will be used to train conversation models. 
+# Scripts to acquire twitter dialogs via REST API 1.1.
 
-    Task B: Any open data, e.g. from web, are available as external knowledge to generate informative sentences. But they should not overlap with the training, validation and test data provided by organizers.
+Copyright (c) 2017 Takaaki Hori  (thori@merl.com)
 
-2. Pilot task: Movie scenario dialog using OpenSubtitle
+This software is released under the MIT License.
+http://opensource.org/licenses/mit-license.php
 
+## Requirements:
 
-* Please cite the following paper if you will publish the results using this setup:
+* 64bit linux/macOSX/windows platform
 
-  https://arxiv.org/pdf/1706.07440.pdf
+* python 2.7.9+, 3.4+
 
-  ```
-  @article{DSTC6_End-to-End_Conversation_Modeling,
-    Author = {Chiori Hori and Takaaki Hori},
-    Title = {End-to-end Conversation Modeling Track in DSTC6},    
-    Journal = {arXiv:1706.07440},    
-    Year = {2017}
-  }
-  ```
+    note: With python 2.7.8 or lower, InsecureRequestWarning may come out  
+          when you run the script.  To suppress this warning, your can  
+          downgrade the requests package by  
 
-# Necessary steps
+    ```
+    $ pip install requests==2.5.3
+    ```
+
+     or
+
+    ```
+    $ pip install requests==2.5.3 -t <some-directory>
+    ```
+
+    where we assume that the module has been installed in &lt;some-directory&gt;
 
 ## Preparation
-Most tools are written in python, which were tested on python2.7.6+ and python3.4.1+,
-and some bash scripts are also used to execute those tools.
 
-For data preparation, you will need additional python modules as follows:
+1. create a twitter account if you don't have it.
 
-* six
-* tqdm
-* nltk
+    you can get it via <https://twitter.com/signup>
 
-which can be installed by
-```
-pip install <module-name>
-```
-or
-```
-pip install <module-name> -t <some-directory>
-```
-where `<some-directory>` is a directory storing python modules and needs to be accessible from python,
-e.g. by including it in PYTHONPATH environment variable.
+2. create your application account via the Twitter
 
-If you try the baseline system, you will need Chainer <http://chainer.org> ,a deep learning toolkit, 
-to perform training and evaluation of neural conversation models.
-Please follow the instruction in `ChatbotBaseline/README.md`.
+    Developer's Site: <https://dev.twitter.com/>
 
-## Twitter task
+    see <https://iag.me/socialmedia/how-to-create-a-twitter-app-in-8-easy-steps/>  
 
-1. prepare data set using `collect_twitter_dialogs` scripts.
+    for reference, and keep the following keys
+
+   * Consumer Key
+   * Consumer Secret
+   * Access Token
+   * Access Token Secret  
+
+3. edit ./config.ini to set your access keys in the config file
+
+   * ConsumerKey
+   * ConsumerSecret
+   * AccessToken
+   * AccessTokenSecret  
+
+4. install python modules: six and requests-oauthlib
+
+    you can install them in the system area by
 
     ```
-    $ cd collect_twitter_dialogs
+    $ pip install six
+    $ pip install requests-oauthlib
+    ```
+
+    We recommend to use virtualenv or some other virtual enviroment to handle pythone modules.
+Otherwise, you can specify the directory to install python modules as
+
+    ```
+    $ pip install <module_name> -t <some_directory>
+    ```
+    In this case, &lt;some-directory&gt; must be included in `PYTHONPATH` environment
+    variable to use the modules.
+
+## How to use:
+
+1. Execute the following command to test your setup
+
+    ```
+    $ collect_twitter_dialogs.py AmazonHelp
+    ```
+
+    and you will obtain a file `AmazonHelp.json`, which contains
+    dialogs from AmazonHelp twitter site.
+
+    since the `AmazonHelp.json` is raw data, you can see the dialog text by
+
+    ```
+    $ view_dialogs.py AmazonHelp.json
+    ```
+
+2. Use `collect.sh` to acquire large data using an account list
+
+    ```
     $ collect.sh
     ```
-    (a twitter account and access keys are necessary to run the script. follow the instruction in `collect_twitter_dialogs/README.md`)
-   
-2. extract training, development and test sets from stored twitter dialog data
-    
-    ```
-    $ cd ../tasks/twitter
-    $ make_trial_data.sh
-    ```
-    
-    Note: the extracted data are trial data at this moment.
 
-3. run baseline system (optional)
+    You will find the collected data in `./stored_data`
 
     ```
-    $ cd ../../ChatbotBaseline/egs/twitter
-    $ run.sh
-    ```
-    
-    (see `ChatbotBaseline/README.md`)
-
-## OpenSubtitles task
-
-1. download OpenSubtitles2016 data
-
-    ```
-    $ cd tasks/opensubs
-    $ wget http://opus.lingfil.uu.se/download.php?f=OpenSubtitles2016/en.tar.gz
-    $ tar zxvf en.tar.gz
+    $ ls stored_data
+    AmazonHelp.json   AskTSA.json ...
     ```
 
-2. extract training, development and test sets from stored subtitle data 
+    To acquire a large amount of data, it is better to run this script
+    once a day, because the amount of data we can download is limited
+    and older tweets cannot be accessed as time goes by.
+
+    In the first run, it will take a several hours to collect all possible
+    data from the listed accounts, but from the second time, the time will
+    become much shorter because the script downloads only newer tweets than
+    already collected tweets.
+
+    Note: the script sometimes reports API errors, but you don't have
+    to worry. Most errors come from access rate limit by the server.
+    Even if the script accidentally stopped, there is no problem.
+    Just re-run the script.
+
+3. Use `official_collect.sh` to acquire official data for DSTC6 End-to-End Conversation Modeling track
 
     ```
-    $ make_trial_data.sh
+    $ official_collect.sh
     ```
-    Note: the extracted data are trial data at this moment.
 
-3. run baseline system (optional)
+    Each challenge participant must run the script by at least 9/8/2017 GMT 24AM (Midnight)
+    and do it once a day until 9/18/2017.
+    This can be done easily by the following command:
 
     ```
-    $ cd ../../ChatbotBaseline/egs/opensubs
-    $ run.sh
+    $ watch -n 86400 official_collect.sh
     ```
-    
-    (see `ChatbotBaseline/README.md`)
 
-## Directories and files
-* README.md : this file
-* tasks : data preparation for each subtask
-* collect_twitter_dialogs : scripts to collect twitter data
-* ChatbotBaseline : a neural conversation model baseline system
+    (The `watch` command will run `official_collect.sh` every 24 hours)
 
-## Contact Information
+    You will find the collected data in `./official_stored_data`
 
-You can get the latest updates and participate in discussions on DSTC mailing list
+    ```
+    $ ls official_stored_data
+    1800flowershelp.json   1800flowers.json   1800PetMeds.json   1DFAQ.json
+    1Sale.json ...
+    ```
 
-To join the mailing list, send an email to: (listserv@lists.research.microsoft.com) putting "subscribe DSTC" in the body of the message (without the quotes). To post a message, send your message to: (dstc@lists.research.microsoft.com).
-
+    A script to extract training, development, and test sets will be provided around 9/18/2017.

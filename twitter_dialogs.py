@@ -141,7 +141,8 @@ def get_timeline_tweets(session, username, count=0, reply_only=True):
     statuses = []
     # wrap our JSON tweets into nice Tweepy Status objects
     for tweet in tweets_json:
-        statuses.append(tweepy.models.Status.parse(tweepy.API(), tweet))
+        if tweet:
+            statuses.append(tweepy.models.Status.parse(tweepy.API(), tweet))
 
     return statuses
 

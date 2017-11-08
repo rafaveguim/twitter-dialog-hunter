@@ -6,14 +6,16 @@ import logging
 import threading
 import multiprocessing as mp
 import argparse
+import traceback
+import twitter_dialogs
+import tweetconvo
 
 from time import time
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from configparser import ConfigParser
 from en_top100 import top100 as top100_english
-import twitter_dialogs
-import tweetconvo
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,7 +26,8 @@ class StreamListener(tweepy.StreamListener):
     length. These conversations are stored and periodically written to a file.
     """
 
-    def __init__(self, outfile_path, config_path, max_processes=4):
+    def __init__(self, outfile_path, config_path, max_threads,
+        max_processes, min_length, max_length):
         super().__init__()
         self.tweet_pool = []
 
@@ -35,12 +38,20 @@ class StreamListener(tweepy.StreamListener):
         self.outfile = open(outfile_path, 'a', encoding='utf-8')
         self.session = twitter_dialogs.get_session(config_path)
 
+        self.min_length = min_length
+        self.max_length = max_length
+
+        self.max_threads = max_threads
         self.max_processes = max_processes
+        self.processes = []
+
+        self.flag_terminate = False # tells process to terminate
 
         for i in range(max_processes):
             process = mp.Process(target=self._consume,
                 args=(self.batch_pool,),
                 daemon=True)
+            self.processes.append(process)
             process.start()
 
     def write_dialogs(self, dialogs):
@@ -52,15 +63,13 @@ class StreamListener(tweepy.StreamListener):
                     str(i),
                     tweet.id,
                     tweet.user,
-                    self.clean_message(tweet.text),
+                    self.clean_message(tweet.text)
                 ]
                 row = ','.join(fields)
                 self.outfile.write(row +'\n')
             self.outfile.flush()
 
         logging.info("Flushing completed.")
-        logging.info("Tweet pool has {} tweets."
-            .format(len(self.tweet_pool)))
 
     def enqueue_tweet(self, tweet):
         # hold max 10*batch_size tweets at a time
@@ -84,22 +93,24 @@ class StreamListener(tweepy.StreamListener):
         Then writes them to a file.
         """
         process_id = mp.current_process()._identity[0]
-        logger = logging.getLogger('Process' + str(process_id))
+        logger = logging.getLogger('Process ' + str(process_id))
 
-        while True:
+        while not self.flag_terminate:
             if batch_pool.empty(): continue
 
             tweets = batch_pool.get()
             results = [] # all dialogs from the batch
+            dialog_refs = dict() # stores the id of the first tweet in dialogs
 
             logger.info("Opened new batch containing {} tweets"\
                 .format(len(tweets)))
 
             for tweet in tweets:
-
-
                 # get timeline tweets using official API
                 author = tweet.user.screen_name
+
+                logger.info("Started scanning {}'s timeline.".format(author))
+
                 timeline_tweets = twitter_dialogs.get_timeline_tweets(
                     self.session, author, 100, reply_only=True)
 
@@ -108,7 +119,8 @@ class StreamListener(tweepy.StreamListener):
                 # use requests_futures to download pages async
                 # and bs4 to scrap them
 
-                session = FuturesSession(executor=ThreadPoolExecutor(max_workers=10))
+                session = FuturesSession(
+                    executor=ThreadPoolExecutor(max_workers=self.max_threads))
                 futures = []
                 for i, timeline_tweet in enumerate(timeline_tweets):
                     url = 'https://twitter.com/i/web/status/{}'\
@@ -121,7 +133,12 @@ class StreamListener(tweepy.StreamListener):
                     try:
                         html = future.result().text
                         dialog = list(tweetconvo.ConvoTweet.from_html(html))
-                        dialogs.append(dialog)
+
+                        # check if we already got this dialog
+                        if dialog[0].id not in dialog_refs:
+                            dialogs.append(dialog)
+                            dialog_refs[dialog[0].id] = True
+
                     except Exception as e:
                         logging.error("Unable to parse {}".format(url))
                         print(e)
@@ -129,17 +146,35 @@ class StreamListener(tweepy.StreamListener):
                 n_valid = 0
 
                 for dialog in dialogs:
-                    if len(dialog) == 6:
+                    if self.min_length <= len(dialog) <= self.max_length:
                         n_valid += 1
                         results.append(dialog)
 
-                logger.info("Got {} dialogs for {}, {} are valid. Process #{}"\
+                logger.info("Got {} dialogs from {}, {} are valid."\
                     .format(len(dialogs), author, n_valid, process_id))
 
             self.write_dialogs(results)
 
+        logger.info("Process #{} terminated.".format(process_id))
+
+
     def clean_message(self, message):
         return message.replace('\n', '')
+
+    def on_warning(self, notice):
+        logging.info("A warning arrived: {}".format(notice))
+
+    def on_event(self, status):
+        logging.info("An event arrived: {}".format(status))
+
+    def on_exception(self, exc):
+        logging.error("An exception occurred. Trying to shutdown processes...")
+        self.flag_terminate = True
+        for process in self.processes:
+            process.join(1)
+        logging.error("All processes were terminated. Raising exception...")
+        raise exc
+
 
     def on_status(self, tweet):
         if tweet.lang != 'en':
@@ -150,6 +185,11 @@ class StreamListener(tweepy.StreamListener):
             return
 
         self.enqueue_tweet(tweet)
+
+    def on_error(self, status_code):
+        logging.error("An error was caught (Status {})".format(status_code))
+        # if status_code == 420:
+        #     return False
 
 
 def get_auth(config_path):
@@ -167,38 +207,49 @@ def get_auth(config_path):
     return auth
 
 
-# OUTFILE = '/Users/rafa/Data/twitter-convos/convos-6.csv'
-BLOOM_FILTER = '/Users/rafa/Data/twitter-convos/bloom.pickle'
 
-
-def main(outfile_path, config_path, max_processes):
+def main(outfile_path, config_path, max_threads, max_processes,
+    min_length, max_length):
     # listen to the stream for english tweets
     # then find author and look for conversations in their timelines
-    myStream = tweepy.Stream(auth=get_auth(config_path),
-        listener=StreamListener(outfile_path, config_path, max_processes))
 
     while True:
         try:
+            listener = StreamListener(outfile_path, config_path, max_threads,
+                max_processes, min_length, max_length)
+            myStream = tweepy.Stream(auth=get_auth(config_path),
+                listener=listener)
             myStream.filter(track=top100_english, languages=['en'],
                 stall_warnings=True)
         except Exception as e:
-            print(e)
+            myStream.disconnect()
+            traceback.print_exc()
+            logging.info("A new instance of the Stream will be created.")
 
 
 def options():
     parser = argparse.ArgumentParser()
     parser.add_argument('config')
     parser.add_argument('outfile')
-    parser.add_argument('-p', '--max_processes', type=int)
+    parser.add_argument('-p', '--max_processes', type=int,
+        help="the number of parallel workers (processes)")
+    parser.add_argument('-t', '--max_threads', type=int, default=2,
+        help="the max. # of threads a process can spawn for downloading pages")
+    parser.add_argument('--min_length', type=int, default=2,
+        help="the minimum length of a conversation")
+    parser.add_argument('--max_length', type=int, default=999,
+        help="the maximum length of a conversation")
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     opts = options()
+
     if not opts.max_processes:
         opts.max_processes = max([mp.cpu_count() - 1, 1])
 
-    main(opts.outfile, opts.config, opts.max_processes)
+    main(opts.outfile, opts.config, opts.max_threads, opts.max_processes,
+        opts.min_length, opts.max_length)
 
 
 # TODO:
@@ -208,5 +259,5 @@ if __name__ == '__main__':
 # + Store bloomfilter to make sure we don't get repeated tweets
 # + Make as much as the process as possible based on BS4 (to avoid getting rate
 #   limit)
-#
+# + save convo id to avoid duplicates
 #
