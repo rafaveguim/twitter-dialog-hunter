@@ -2,7 +2,8 @@
 
 This Python script uses the Twitter API and BeautifulSoup to
 find and download dialogs from Twitter. It is built on top of the
-`collect_twitter_dialogs` module from DSTC6-End-to-End-Conversation-Modeling.
+`collect_twitter_dialogs` module from
+[DSTC6-End-to-End-Conversation-Modeling](https://github.com/dialogtekgeek/DSTC6-End-to-End-Conversation-Modeling).
 
 It is meant to overcome some limitations of the DSTC6 module and other
 scrapers. The script doesn't require a list of source accounts,
@@ -64,7 +65,7 @@ and treads.
   OK to stop and restart the script later. Previous results will not be lost.
 
   You can inform the path to a custom config file with `--config`. This is useful
-  for when you have many set of credentials. Each run can use a different set to
+  for when you have many sets of credentials. Each run can use a different set to
   avoid rate-limiting.
 
 
@@ -82,3 +83,12 @@ and treads.
   high (e.g. 10), the threads will compete with the thread that listens to
   the Streaming API, causing it to fall behind. When a client fails to keep up with
   the stream, Twitter disconnects it.
+
+## Duplicates
+
+  The script does not guarantee the conversations are unique. If a user
+  appears twice in the stream, then her dialogs will be collected twice.
+
+  To guarantee uniqueness of the conversations, it's better to run a second
+  script to remove duplicates. A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter)
+  can help scaling this task. There's a [good one written in Python](https://github.com/jaybaird/python-bloomfilter).
