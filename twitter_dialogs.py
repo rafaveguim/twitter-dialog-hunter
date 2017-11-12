@@ -138,6 +138,10 @@ def get_timeline_tweets(session, username, count=0, reply_only=True):
     get_user_timeline.waitReady()
 
     tweets_json = get_user_timeline.call()
+
+    if not tweets_json:
+        return None
+
     statuses = []
     # wrap our JSON tweets into nice Tweepy Status objects
     for tweet in tweets_json:

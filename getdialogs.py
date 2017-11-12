@@ -114,6 +114,10 @@ class StreamListener(tweepy.StreamListener):
                 timeline_tweets = twitter_dialogs.get_timeline_tweets(
                     self.session, author, 100, reply_only=True)
 
+                if not timeline_tweets:
+                    logger.warning("Unable to fetch {}'s timeline".format(author))
+                    continue
+
                 # each dialog has a url
                 # (e.g., https://twitter.com/ABakerN7/status/922558430640070658)
                 # use requests_futures to download pages async
@@ -250,14 +254,3 @@ if __name__ == '__main__':
 
     main(opts.outfile, opts.config, opts.max_threads, opts.max_processes,
         opts.min_length, opts.max_length)
-
-
-# TODO:
-# + (Done) Work around truncated statuses. Possibly, follow link
-# with fake_useragent and extract tweet with beautifulsoup
-# + (Done) Make beautifulsoup-based functions to extract tweets
-# + Store bloomfilter to make sure we don't get repeated tweets
-# + Make as much as the process as possible based on BS4 (to avoid getting rate
-#   limit)
-# + save convo id to avoid duplicates
-#
