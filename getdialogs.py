@@ -176,6 +176,7 @@ class StreamListener(tweepy.StreamListener):
         self.flag_terminate = True
         for process in self.processes:
             process.join(1)
+        self.outfile.close()
         logging.error("All processes were terminated. Raising exception...")
         raise exc
 
