@@ -5,23 +5,20 @@ import logging
 
 class ConvoTweet:
 
-    def __init__(self, user, id, fullname, text):
+    def __init__(self, user, tweet_id, convo_id, fullname, text):
         self.user = user
-        self.id = id
-        # self.timestamp = timestamp
+        self.id = tweet_id
+        self.convo_id = convo_id
         self.fullname = fullname
         self.text = text
-        # self.replies = replies
-        # self.retweets = retweets
-        # self.likes = likes
+
 
     @classmethod
     def from_soup(cls, tweet):
         return cls(
             user=tweet['data-screen-name'],
-            id=tweet['data-tweet-id'],
-            # timestamp=datetime.utcfromtimestamp(
-            #     int(tweet.find('span', '_timestamp')['data-time'])),
+            tweet_id=tweet['data-tweet-id'],
+            convo_id=tweet['data-conversation-id'],
             fullname=tweet['data-name'],
             text=tweet.find('p', 'js-tweet-text').text or ""
         )

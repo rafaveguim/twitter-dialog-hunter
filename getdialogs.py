@@ -60,6 +60,7 @@ class StreamListener(tweepy.StreamListener):
         for dialog in dialogs:
             for i, tweet in enumerate(dialog):
                 fields = [
+                    tweet.convo_id,
                     str(i),
                     tweet.id,
                     tweet.user,
