@@ -8,8 +8,8 @@ import multiprocessing as mp
 import argparse
 import traceback
 import twitter_dialogs
-import tweetconvo
 
+from scraping import Tweet
 from time import time
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
@@ -27,7 +27,7 @@ class StreamListener(tweepy.StreamListener):
     """
 
     def __init__(self, outfile_path, config_path, max_threads,
-        max_processes, min_length, max_length):
+        max_processes, min_length, max_length, num_speakers=None):
         super().__init__()
         self.tweet_pool = []
 
@@ -40,6 +40,7 @@ class StreamListener(tweepy.StreamListener):
 
         self.min_length = min_length
         self.max_length = max_length
+        self.num_speakers = num_speakers
 
         self.max_threads = max_threads
         self.max_processes = max_processes
@@ -112,8 +113,9 @@ class StreamListener(tweepy.StreamListener):
 
                 logger.info("Started scanning {}'s timeline.".format(author))
 
-                timeline_tweets = twitter_dialogs.get_timeline_tweets(
-                    self.session, author, 100, reply_only=True)
+                # timeline_tweets = twitter_dialogs.get_timeline_tweets(
+                    # self.session, author, 100, reply_only=True)
+                timeline_tweets = Tweet.from_timeline(author, max_count=500)
 
                 if not timeline_tweets:
                     logger.warning("Unable to fetch {}'s timeline".format(author))
@@ -136,17 +138,32 @@ class StreamListener(tweepy.StreamListener):
                 dialogs = []
                 for url, future in futures:
                     try:
-                        html = future.result().text
-                        dialog = list(tweetconvo.ConvoTweet.from_html(html))
+                        response = future.result()
+                        if response.status_code != 200:
+                            logging.info("{} returned {}".format(url, response.status_code))
+                            continue
+                        html = response.text
+                        dialog = list(Tweet.from_conversation(html))
+
+                        if len(dialog) == 0:
+                            continue
 
                         # check if we already got this dialog
-                        if dialog[0].id not in dialog_refs:
-                            dialogs.append(dialog)
-                            dialog_refs[dialog[0].id] = True
+                        if dialog[0].id in dialog_refs:
+                            continue
+
+                        # check if this dialog has the desired number of speakers
+                        speakers = set([tweet.user for tweet in dialog])
+                        if self.num_speakers and len(speakers) != self.num_speakers:
+                            continue
+
+                        dialogs.append(dialog)
+                        dialog_refs[dialog[0].id] = True
 
                     except Exception as e:
-                        logging.error("Unable to parse {}".format(url))
-                        print(e)
+                        # logging.error("Unable to parse {}".format(url))
+                        raise
+
 
                 n_valid = 0
 
@@ -215,14 +232,14 @@ def get_auth(config_path):
 
 
 def main(outfile_path, config_path, max_threads, max_processes,
-    min_length, max_length):
+    min_length, max_length, num_speakers):
     # listen to the stream for english tweets
     # then find author and look for conversations in their timelines
 
     while True:
         try:
             listener = StreamListener(outfile_path, config_path, max_threads,
-                max_processes, min_length, max_length)
+                max_processes, min_length, max_length, num_speakers)
             myStream = tweepy.Stream(auth=get_auth(config_path),
                 listener=listener)
             myStream.filter(track=top100_english, languages=['en'],
@@ -245,6 +262,8 @@ def options():
         help="the minimum length of a conversation")
     parser.add_argument('--max_length', type=int, default=999,
         help="the maximum length of a conversation")
+    parser.add_argument('--num_speakers', type=int, default=None,
+        help="desired number of speakers (e.g. 2)")
     return parser.parse_args()
 
 
@@ -255,4 +274,4 @@ if __name__ == '__main__':
         opts.max_processes = max([mp.cpu_count() - 1, 1])
 
     main(opts.outfile, opts.config, opts.max_threads, opts.max_processes,
-        opts.min_length, opts.max_length)
+        opts.min_length, opts.max_length, opts.num_speakers)
