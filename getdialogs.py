@@ -8,6 +8,7 @@ import multiprocessing as mp
 import argparse
 import traceback
 import twitter_dialogs
+import re
 
 from scraping import Tweet
 from time import time
@@ -181,7 +182,7 @@ class StreamListener(tweepy.StreamListener):
 
 
     def clean_message(self, message):
-        return message.replace('\n', '')
+        return re.sub('[\r\n]', ' ', message)
 
     def on_warning(self, notice):
         logging.info("A warning arrived: {}".format(notice))
@@ -197,7 +198,6 @@ class StreamListener(tweepy.StreamListener):
         self.outfile.close()
         logging.error("All processes were terminated. Raising exception...")
         raise exc
-
 
     def on_status(self, tweet):
         if tweet.lang != 'en':
