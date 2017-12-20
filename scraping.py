@@ -40,6 +40,8 @@ class Tweet:
                     yield cls.from_soup(tweet)
                 except AttributeError:
                     pass  # Incomplete info? Discard!
+                except KeyError:
+                    pass
 
     # @classmethod
     # def from_timeline(cls, username, max_count=200, reply_only=False):
@@ -109,7 +111,10 @@ class Tweet:
             }
         url = 'https://api.twitter.com/1.1/statuses/user_timeline.json'
         response = requests.get(url, params=params, headers=headers)
-        for tweet_json in response.json():
+        if response.status_code != 200:
+            logging.error("{} returned status {}".format(url, response.status_code))
+        rjson = response.json()
+        for tweet_json in rjson:
             if reply_only and tweet_json['in_reply_to_user_id'] is None:
                 continue
 
@@ -130,6 +135,10 @@ class Tweet:
 
 
 # =============================
+# response = requests.get('https://twitter.com/i/web/status/943135577532137473')
+# response.text
+# tweets = list(Tweet.from_conversation(response.text))
+# tweets
 
 # tweets = list(Tweet.from_timeline('rafaveguim', reply_only=True))
 # len(tweets)
