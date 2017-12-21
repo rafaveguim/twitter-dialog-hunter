@@ -111,9 +111,15 @@ class Tweet:
             }
         url = 'https://api.twitter.com/1.1/statuses/user_timeline.json'
         response = requests.get(url, params=params, headers=headers)
+        rjson = response.json()
+
         if response.status_code != 200:
             logging.error("{} returned status {}".format(url, response.status_code))
-        rjson = response.json()
+            return []
+        if type(rjson) != dict:
+            logging.error("{} returned the following message: {}".format(url, rjson))
+            return []
+
         for tweet_json in rjson:
             if reply_only and tweet_json['in_reply_to_user_id'] is None:
                 continue
