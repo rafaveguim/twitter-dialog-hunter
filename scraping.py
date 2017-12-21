@@ -120,9 +120,9 @@ class Tweet:
             logging.error("{} returned the following message: {}".format(url, rjson))
             return []
 
-        for tweet_json in rjson:
-            if reply_only and tweet_json['in_reply_to_user_id'] is None:
-                continue
+        # for tweet_json in rjson:
+        #     if reply_only and tweet_json['in_reply_to_user_id'] is None:
+        #         continue
 
             yield cls(
                         user=tweet_json['user']['screen_name'],
