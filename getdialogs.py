@@ -9,9 +9,10 @@ import argparse
 import traceback
 import twitter_dialogs
 import re
+import requests
 
 from scraping import Tweet
-from time import time
+from time import time, sleep
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from configparser import ConfigParser
@@ -160,6 +161,11 @@ class StreamListener(tweepy.StreamListener):
 
                         dialogs.append(dialog)
                         dialog_refs[dialog[0].id] = True
+                    except requests.exceptions.ConnectionError as e:
+                        # twitter probably rejected the request
+                        # wait a moment
+                        logging.error(str(e))
+                        sleep(5)
 
                     except Exception as e:
                         # logging.error("Unable to parse {}".format(url))

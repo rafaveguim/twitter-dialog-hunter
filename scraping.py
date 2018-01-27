@@ -33,7 +33,10 @@ class Tweet:
     def from_conversation(cls, html):
         soup = BeautifulSoup(html, "lxml")
         overlay = soup.find('div', id='permalink-overlay')
-        tweets  = overlay.find_all('div', 'tweet')
+        if overlay:
+            tweets  = overlay.find_all('div', 'tweet')
+        else:
+            return []
         if tweets:
             for tweet in tweets:
                 try:
@@ -110,12 +113,18 @@ class Tweet:
             'count':max_count
             }
         url = 'https://api.twitter.com/1.1/statuses/user_timeline.json'
-        response = requests.get(url, params=params, headers=headers)
-        rjson = response.json()
+
+        try:
+            response = requests.get(url, params=params, headers=headers)
+        except:
+            return []
 
         if response.status_code != 200:
             logging.error("{} returned status {}".format(url, response.status_code))
             return []
+        
+        rjson = response.json()
+        
         # if type(rjson) != dict:
         #     logging.error("{} returned the following message: {}".format(url, rjson))
         #     return []
