@@ -11,13 +11,13 @@ import twitter_dialogs
 import re
 import requests
 
-from scraping import Tweet
-from time import time, sleep
-from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
-from configparser import ConfigParser
-from en_top100 import top100 as top100_english
-
+from scraping             import Tweet
+from time                 import time, sleep
+from concurrent.futures   import ThreadPoolExecutor
+from configparser         import ConfigParser
+from en_top100            import top100 as top100_english
+from collections          import deque
 
 logging.basicConfig(level=logging.INFO)
 
@@ -31,7 +31,7 @@ class StreamListener(tweepy.StreamListener):
     def __init__(self, outfile_path, config_path, max_threads,
         max_processes, min_length, max_length, num_speakers=None):
         super().__init__()
-        self.tweet_pool = []
+        self.tweet_pool = deque()
 
         # stores batches of tweets to be shared with worker processes
         self.batch_pool = mp.Queue(20) # holds max 20 batches a time
@@ -76,9 +76,14 @@ class StreamListener(tweepy.StreamListener):
         logging.info("Flushing completed.")
 
     def enqueue_tweet(self, tweet):
+        # tweet_pool works like a conveyor belt
         # hold max 10*batch_size tweets at a time
-        if len(self.tweet_pool) < 10*self.batch_size:
-            self.tweet_pool.append(tweet)
+        # when an empty slot appears in batch_pool, a number of tweets are
+        # removed from tweet_pool and put in batch_pool for consumption
+        self.tweet_pool.append(tweet)
+        
+        if len(self.tweet_pool) > 10*self.batch_size:
+            self.tweet_pool.popleft()
 
         # if there's room in the batch_pool and we have enough tweets for a new
         # batch, then enqueue a new batch
@@ -87,7 +92,7 @@ class StreamListener(tweepy.StreamListener):
 
             batch = []
             for _ in range(self.batch_size):
-                batch.append(self.tweet_pool.pop())
+                batch.append(self.tweet_pool.popleft())
             self.batch_pool.put(batch)
 
     def _consume(self, batch_pool):
