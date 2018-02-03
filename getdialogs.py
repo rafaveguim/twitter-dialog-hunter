@@ -10,6 +10,7 @@ import traceback
 import twitter_dialogs
 import re
 import requests
+from time import sleep
 
 from requests_futures.sessions import FuturesSession
 from scraping             import Tweet
@@ -31,6 +32,7 @@ class StreamListener(tweepy.StreamListener):
     def __init__(self, outfile_path, config_path, max_threads,
         max_processes, min_length, max_length, num_speakers=None):
         super().__init__()
+        
         self.tweet_pool = deque()
 
         # stores batches of tweets to be shared with worker processes
@@ -38,7 +40,7 @@ class StreamListener(tweepy.StreamListener):
         self.batch_size = 5
 
         self.outfile = open(outfile_path, 'a', encoding='utf-8')
-        self.session = twitter_dialogs.get_session(config_path)
+        # self.session = twitter_dialogs.get_session(config_path)
 
         self.min_length = min_length
         self.max_length = max_length
@@ -48,12 +50,11 @@ class StreamListener(tweepy.StreamListener):
         self.max_processes = max_processes
         self.processes = []
 
-        self.flag_terminate = False # tells process to terminate
+        self.flag_terminate = mp.Value('b', False) # tells process to terminate
 
         for i in range(max_processes):
             process = mp.Process(target=self._consume,
-                args=(self.batch_pool,),
-                daemon=True)
+                args=(self.batch_pool,), daemon=True)
             self.processes.append(process)
             process.start()
 
@@ -104,7 +105,7 @@ class StreamListener(tweepy.StreamListener):
         process_id = mp.current_process()._identity[0]
         logger = logging.getLogger('Process ' + str(process_id))
 
-        while not self.flag_terminate:
+        while not self.flag_terminate.value:
             if batch_pool.empty(): continue
 
             tweets = batch_pool.get()
@@ -176,7 +177,6 @@ class StreamListener(tweepy.StreamListener):
                         # logging.error("Unable to parse {}".format(url))
                         raise
 
-
                 n_valid = 0
 
                 for dialog in dialogs:
@@ -202,12 +202,12 @@ class StreamListener(tweepy.StreamListener):
         logging.info("An event arrived: {}".format(status))
 
     def on_exception(self, exc):
-        logging.error("An exception occurred. Trying to shutdown processes...")
-        self.flag_terminate = True
-        for process in self.processes:
-            process.join(1)
-        self.outfile.close()
-        logging.error("All processes were terminated. Raising exception...")
+        # logging.error("An exception occurred. Trying to shutdown processes...")
+        # self.flag_terminate.value = True
+        # for process in self.processes:
+        #     process.join()
+        # self.outfile.close()
+        # logging.error("All processes were terminated. Raising exception...")
         raise exc
 
     def on_status(self, tweet):
@@ -247,18 +247,21 @@ def main(outfile_path, config_path, max_threads, max_processes,
     # listen to the stream for english tweets
     # then find author and look for conversations in their timelines
 
-    while True:
-        try:
-            listener = StreamListener(outfile_path, config_path, max_threads,
+    listener = StreamListener(outfile_path, config_path, max_threads,
                 max_processes, min_length, max_length, num_speakers)
+
+    while True:    
+        try:
             myStream = tweepy.Stream(auth=get_auth(config_path),
                 listener=listener)
             myStream.filter(track=top100_english, languages=['en'],
                 stall_warnings=True)
         except Exception as e:
+            logging.info("The Stream got interrupted.")
             myStream.disconnect()
             traceback.print_exc()
             logging.info("A new instance of the Stream will be created.")
+
 
 
 def options():
